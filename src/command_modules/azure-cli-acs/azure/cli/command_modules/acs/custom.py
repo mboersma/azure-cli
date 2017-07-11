@@ -373,7 +373,7 @@ def acs_create(resource_group_name, deployment_name, name, ssh_key_value, dns_na
                agent_vm_size="Standard_D2_v2", location=None, master_count=1,
                orchestrator_type="dcos", service_principal=None, client_secret=None, tags=None,
                windows=False, admin_password="", generate_ssh_keys=False,  # pylint: disable=unused-argument
-               validate=False, no_wait=False):
+               validate=False, no_wait=False, hosted_masters=False):
     """Create a new Acs.
     :param resource_group_name: The name of the resource group. The name
      is case insensitive.
@@ -433,6 +433,8 @@ def acs_create(resource_group_name, deployment_name, name, ssh_key_value, dns_na
     :rtype: :class:`ClientRawResponse<msrest.pipeline.ClientRawResponse>`
      if raw=true
     :raises: :class:`CloudError<msrestazure.azure_exceptions.CloudError>`
+    :param hosted_masters: If true, the cluster will be built with Azure hosting and maintaining the master node(s).
+    :type windows: bool
     """
     if ssh_key_value is not None and not _is_valid_ssh_rsa_public_key(ssh_key_value):
         raise CLIError('Provided ssh key ({}) is invalid or non-existent'.format(ssh_key_value))
@@ -483,8 +485,11 @@ def acs_create(resource_group_name, deployment_name, name, ssh_key_value, dns_na
                                   location=location, service_principal=service_principal,
                                   client_secret=client_secret, master_count=master_count,
                                   windows=windows, admin_password=admin_password,
-                                  validate=validate, no_wait=no_wait, tags=tags)
+                                  validate=validate, no_wait=no_wait, tags=tags,
+                                  hosted_masters=hosted_masters)
 
+    if hosted_masters:
+        raise CLIError('--hosted-masters is only supported for Kubernetes clusters')
     if windows:
         raise CLIError('--windows is only supported for Kubernetes clusters')
     if location is None:
