@@ -54,7 +54,6 @@ from azure.mgmt.containerservice.models import ContainerServiceSshConfiguration
 from azure.mgmt.containerservice.models import ContainerServiceSshPublicKey
 from azure.mgmt.containerservice.models import ContainerServiceStorageProfileTypes
 from azure.mgmt.containerservice.models import ManagedCluster
-from azure.mgmt.containerservice.models import ManagedClusterProperties
 
 from knack.log import get_logger
 from knack.util import CLIError
@@ -1327,13 +1326,13 @@ def aks_create(cmd, client, resource_group_name, name, ssh_key_value,  # pylint:
         secret=principal_obj.get("client_secret"),
         key_vault_secret_ref=None)
 
-    props = ManagedClusterProperties(
+    mc = ManagedCluster(
+        location=location, tags=tags,
         dns_prefix=dns_name_prefix,
         kubernetes_version=kubernetes_version,
         agent_pool_profiles=[agent_pool_profile],
         linux_profile=linux_profile,
         service_principal_profile=service_principal_profile)
-    mc = ManagedCluster(location=location, tags=tags, properties=props)
 
     # Due to SPN replication latency, we do a few retries here
     max_retry = 30
@@ -1361,10 +1360,10 @@ def aks_get_credentials(cmd, client, resource_group_name, name, admin=False,
     :type admin: bool
     """
     mc = aks_show(cmd, client, resource_group_name, name)
-    access_profiles = mc.properties.access_profiles
+    access_profiles = mc.access_profiles
     if not access_profiles:
         msg = "No Kubernetes access profiles found. Cluster provisioning state is \"{}\"."
-        raise CLIError(msg.format(mc.properties.provisioning_state))
+        raise CLIError(msg.format(mc.provisioning_state))
     else:
         access_profiles = access_profiles.as_dict()
         access_profile = access_profiles.get('cluster_admin' if admin else 'cluster_user')
@@ -1398,10 +1397,10 @@ def aks_scale(cmd, client, resource_group_name, name, node_count, no_wait=False)
     """
     instance = client.get(resource_group_name, name)
     # TODO: change this approach when we support multiple agent pools.
-    instance.properties.agent_pool_profiles[0].count = int(node_count)  # pylint: disable=no-member
+    instance.agent_pool_profiles[0].count = int(node_count)  # pylint: disable=no-member
 
     # null out the service principal because otherwise validation complains
-    instance.properties.service_principal_profile = None
+    instance.service_principal_profile = None
 
     return client.create_or_update(resource_group_name, name, instance, raw=no_wait)
 
@@ -1416,10 +1415,10 @@ def aks_upgrade(cmd, client, resource_group_name, name, kubernetes_version, no_w
     :type no_wait: bool
     """
     instance = client.get(resource_group_name, name)
-    instance.properties.kubernetes_version = kubernetes_version
+    instance.kubernetes_version = kubernetes_version
 
     # null out the service principal because otherwise validation complains
-    instance.properties.service_principal_profile = None
+    instance.service_principal_profile = None
 
     return client.create_or_update(resource_group_name, name, instance, raw=no_wait)
 
@@ -1513,12 +1512,11 @@ def _remove_nulls(managed_clusters):
         for attr in attrs:
             if getattr(managed_cluster, attr, None) is None:
                 delattr(managed_cluster, attr)
-        props = managed_cluster.properties
-        for ap_profile in props.agent_pool_profiles:
+        for ap_profile in managed_cluster.agent_pool_profiles:
             for attr in ap_attrs:
                 if getattr(ap_profile, attr, None) is None:
                     delattr(ap_profile, attr)
         for attr in sp_attrs:
-            if getattr(props.service_principal_profile, attr, None) is None:
-                delattr(props.service_principal_profile, attr)
+            if getattr(managed_cluster.service_principal_profile, attr, None) is None:
+                delattr(managed_cluster.service_principal_profile, attr)
     return managed_clusters
